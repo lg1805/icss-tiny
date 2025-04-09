@@ -9,7 +9,7 @@ UPLOAD_FOLDER = 'uploads/processed/'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 RPN_FILE = r"C:\Users\intern214.koel\Downloads\ICSS-WebApp_Ready\RPN.xlsx"
-rpn_data = pd.read_excel('ProcesssedData/RPN.xlsx')
+rpn_data = pd.read_excel('ProcessedData/RPN.xlsx')
 known_components = rpn_data["Component"].dropna().unique().tolist()
 
 def extract_component(observation):
