@@ -5,3 +5,4 @@ gunicorn
 flask-cors          # if you're handling CORS
 python-dotenv       # if using .env file
 xlrd                # if working with older Excel files (.xls)
+xlsxwriter
