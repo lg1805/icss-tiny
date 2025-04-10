@@ -87,7 +87,7 @@ def upload_file():
         except Exception as e:
             return f"Error reading file: {e}", 400
 
-        if 'Observation' not in df.columns or 'Creation Date' not in df.columns or 'Incident no' not in df.columns:
+        if 'Observation' not in df.columns or 'Creation Date' not in df.columns or 'Incident Id' not in df.columns:
             return "Required columns missing", 400
 
         formatted_dates = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
@@ -140,7 +140,7 @@ def upload_file():
                         worksheet.write(idx + 1, sheet_df.columns.get_loc("Incident Status"), sheet_df.loc[row_idx, "Incident Status"], green_fmt)
                     elif color:
                         fmt = workbook.add_format({'bg_color': color})
-                        worksheet.write(idx + 1, sheet_df.columns.get_loc("Incident no"), sheet_df.loc[row_idx, "Incident no"], fmt)
+                        worksheet.write(idx + 1, sheet_df.columns.get_loc("Incident Id"), sheet_df.loc[row_idx, "Incident Id"], fmt)
 
         return send_file(processed_filepath, as_attachment=True)
 
