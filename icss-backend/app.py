@@ -3,6 +3,8 @@ import pandas as pd
 import os
 from datetime import datetime
 import xlsxwriter
+from textblob import TextBlob
+from rapidfuzz import fuzz
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads/processed/'
@@ -12,12 +14,22 @@ RPN_FILE = r"D:\KOEL\ICSS\Deployment\icss-backend\ProcessedData\RPN.xlsx"
 rpn_data = pd.read_excel('ProcessedData/RPN.xlsx')
 known_components = rpn_data["Component"].dropna().unique().tolist()
 
-def extract_component(observation):
+def extract_component(observation, threshold=80):
     if pd.notna(observation):
+        # Step 1: Spell correction
+        corrected = str(TextBlob(observation)).correct()
+
+        # Step 2: Fuzzy match with known components
+        best_match = None
+        highest_score = 0
         for component in known_components:
-            if str(component).lower() in observation.lower():
-                return component
+            score = fuzz.partial_ratio(component.lower(), corrected.lower())
+            if score > highest_score and score >= threshold:
+                highest_score = score
+                best_match = component
+        return best_match if best_match else "Unknown"
     return "Unknown"
+
 
 def get_rpn_values(component):
     row = rpn_data[rpn_data["Component"] == component]
