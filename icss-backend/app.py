@@ -6,31 +6,43 @@ import xlsxwriter
 from textblob import TextBlob
 from rapidfuzz import fuzz
 
-app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads/processed/'
+app = Flask(__name__, template_folder="icss-backend/templates", static_folder="static")
+
+# Define the upload folder and ensure it exists
+UPLOAD_FOLDER = os.path.expanduser('~') + '\\uploads'  # This will place the folder in your user directory
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Path for the RPN file
 RPN_FILE = r"D:\KOEL\ICSS\Deployment\icss-backend\ProcessedData\RPN.xlsx"
-rpn_data = pd.read_excel('ProcessedData/RPN.xlsx')
+rpn_data = pd.read_excel(RPN_FILE)
 known_components = rpn_data["Component"].dropna().unique().tolist()
 
-def extract_component(observation, threshold=80):
-    if pd.notna(observation):
-        # Step 1: Spell correction
-        corrected = str(TextBlob(observation)).correct()
+threshold = 80  # Fuzzy matching threshold
 
-        # Step 2: Fuzzy match with known components
+# Function to extract components based on fuzzy matching
+def extract_component(observation):
+    try:
+        corrected = TextBlob(observation).correct()
+        corrected_str = str(corrected)
+  # Fixes spelling
+        # Your actual keyword/component matching logic goes here using `corrected`
+        return corrected  # Or return matched component if you have logic
+    except Exception as e:
+        print(f"Error processing observation: {observation}, Error: {e}")
+        return observation  # Fallback to original
+
         best_match = None
         highest_score = 0
         for component in known_components:
-            score = fuzz.partial_ratio(component.lower(), corrected.lower())
+            score = fuzz.partial_ratio(component.lower(), str(corrected).lower())
             if score > highest_score and score >= threshold:
                 highest_score = score
                 best_match = component
-        return best_match if best_match else "Unknown"
-    return "Unknown"
+                
+        return best_match or "Unknown"
+    return "Unknown"  # If observation is not a string, return "Unknown"
 
-
+# Function to get RPN values
 def get_rpn_values(component):
     row = rpn_data[rpn_data["Component"] == component]
     if not row.empty:
@@ -40,6 +52,7 @@ def get_rpn_values(component):
         return severity, occurrence, detection
     return 1, 1, 10
 
+# Function to determine priority based on RPN
 def determine_priority(rpn):
     if rpn >= 200:
         return "High"
@@ -48,6 +61,7 @@ def determine_priority(rpn):
     else:
         return "Low"
 
+# Function to convert month string to number
 def month_str_to_num(month_hint):
     month_map = {
         "jan": "01", "feb": "02", "mar": "03", "apr": "04",
@@ -56,6 +70,7 @@ def month_str_to_num(month_hint):
     }
     return month_map.get(month_hint.lower(), None)
 
+# Function to format the creation date
 def format_creation_date(date_str, month_hint):
     target_month = month_str_to_num(month_hint)
     if not target_month:
@@ -75,10 +90,7 @@ def format_creation_date(date_str, month_hint):
 
     return None, None
 
-@app.route('/')
-def index():
-    return render_template('frontNEW.html')
-
+# Set up Flask route for file upload
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'complaint_file' not in request.files:
@@ -156,7 +168,7 @@ def upload_file():
 
         return send_file(processed_filepath, as_attachment=True)
 
-import os       
-
-port = int(os.environ.get("PORT", 5000))
-app.run(host="0.0.0.0", port=port)
+# Start Flask application
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
