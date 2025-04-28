@@ -1,13 +1,12 @@
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
 from flask import Flask, request, render_template, send_file
 import pandas as pd
-import os
 from datetime import datetime
-import xlsxwriter
 from rapidfuzz import fuzz
 from concurrent.futures import ThreadPoolExecutor
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads/processed/'
@@ -19,102 +18,46 @@ if not os.path.exists(RPN_FILE):
 
 # Load the RPN data file here
 rpn_data = pd.read_excel(RPN_FILE)
-
-# Now it's safe to access 'rpn_data'
 known_components = rpn_data["Component"].dropna().unique().tolist()
 
 # Use ThreadPoolExecutor for parallel execution
 executor = ThreadPoolExecutor(max_workers=4)  # You can adjust based on available CPU cores
 
-def extract_component(obs):
-    obs = str(obs).strip()
-    best_match = None
-    highest_score = 0
-    for comp in known_components:
-        score = fuzz.partial_ratio(comp.lower(), obs.lower())
-        if score > highest_score and score >= 80:
-            best_match = comp
-            highest_score = score
-    return best_match if best_match else "Unknown"
-
-def get_rpn_values(component):
-    row = rpn_data[rpn_data["Component"] == component]
-    if not row.empty:
-        severity = int(row["Severity (S)"].values[0])
-        occurrence = int(row["Occurrence (O)"].values[0])
-        detection = int(row["Detection (D)"].values[0])
-        return severity, occurrence, detection
-    return 1, 1, 10  # Default values if no match
-
-def determine_priority(rpn):
-    if rpn >= 200:
-        return "High"
-    elif rpn >= 100:
-        return "Moderate"
-    else:
-        return "Low"
-
-def month_str_to_num(month_hint):
-    month_map = {
-        "jan": "01", "feb": "02", "mar": "03", "apr": "04",
-        "may": "05", "jun": "06", "jul": "07", "aug": "08",
-        "sep": "09", "oct": "10", "nov": "11", "dec": "12"
-    }
-    return month_map.get(month_hint.lower(), None)
-
-def format_creation_date(date_str, month_hint):
-    target_month = month_str_to_num(month_hint)
-    if not target_month:
-        return None, None
-
-    try:
-        date_str = str(date_str).strip()
-        dt = pd.to_datetime(date_str, errors='coerce', dayfirst=True)
-
-        if pd.notna(dt):
-            dd, mm, yyyy = dt.day, dt.month, dt.year
-            if str(dd).zfill(2) == "01" and str(mm).zfill(2) == "01":
-                dd, mm = mm, int(target_month)
-            return f"{str(dd).zfill(2)}/{target_month}/{yyyy}", (datetime.now() - dt).days
-    except Exception:
-        return None, None
-
-    return None, None
-
-# Function to send email alert for RED-highlighted rows
-def send_email_alert(red_rows, recipient_email):
+# Helper function to send email alert
+def send_email_alert(row):
     sender_email = "lakshyarubi@gmail.com"
-    sender_password = "selr fdih wlkm wufg"
-    
-    # Create email message
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = recipient_email
-    msg['Subject'] = "Incident Alert: RED Highlighted Cases"
+    receiver_email = "lakshyarubi@gmail.com"
+    password = "your_app_password"
 
-    # Create the email body
-    body = "Dear User,\n\nPlease find the details of the RED-highlighted cases below:\n\n"
-    
-    # Add the RED-highlighted rows to the body
-    body += red_rows.to_string(index=False)  # Convert DataFrame to string representation
-    
-    # Attach the body to the email
-    msg.attach(MIMEText(body, 'plain'))
+    subject = f"Alert: Issue in Incident ID {row['Incident Id']}"
+    body = f"""
+    Incident Id: {row['Incident Id']}
+    Observation: {row['Observation']}
+    Creation Date: {row['Creation Date']}
+    Component: {row['Component']}
+    Severity: {row['Severity (S)']}
+    Occurrence: {row['Occurrence (O)']}
+    Detection: {row['Detection (D)']}
+    RPN: {row['RPN']}
+    Priority: {row['Priority']}
+    """
+
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = receiver_email
+    message["Subject"] = subject
+    message.attach(MIMEText(body, "plain"))
 
     try:
-        # Connect to Gmail's SMTP server
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(sender_email, sender_password)
-            # Send email
-            server.sendmail(sender_email, recipient_email, msg.as_string())
-        print("Email sent successfully!")
+        server = smtplib.SMTP("smtp.gmail.com", 587)  # Port 587 for STARTTLS
+        server.starttls()  # Start TLS encryption
+        server.login(sender_email, password)
+        text = message.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+        print(f"Email sent for Incident ID: {row['Incident Id']}")
     except Exception as e:
-        print(f"Error sending email: {e}")
-
-# Function to filter RED-highlighted rows
-def filter_red_rows(df):
-    red_rows = df[df["Incident Status"].str.lower().str.contains("red")]
-    return red_rows
+        print(f"Error sending email for {row['Incident Id']}: {e}")
 
 @app.route('/')
 def index():
@@ -147,18 +90,6 @@ def upload_file():
         df['Creation Date'] = formatted_dates.apply(lambda x: x[0])
         days_elapsed = formatted_dates.apply(lambda x: x[1])
 
-        def get_color(elapsed):
-            if elapsed == 1:
-                return '#ADD8E6'
-            elif elapsed == 2:
-                return '#FFFF00'
-            elif elapsed == 3:
-                return '#FF1493'
-            elif elapsed > 3:
-                return '#FF0000'
-            else:
-                return None
-
         # Step 3: Run NLP and matching in parallel using ThreadPoolExecutor
         df["Component"] = list(executor.map(extract_component, df["Observation"]))
 
@@ -175,6 +106,13 @@ def upload_file():
         priority_order = {"High": 1, "Moderate": 2, "Low": 3}
         spn_df = spn_df.sort_values(by="Priority", key=lambda x: x.map(priority_order))
         non_spn_df = non_spn_df.sort_values(by="Priority", key=lambda x: x.map(priority_order))
+
+        # Highlight and process RED highlighted rows (for Incident Status = "closed" or "complete")
+        red_highlighted_rows = df[df["Incident Status"].str.contains("closed|complete", case=False, na=False)]
+
+        # Send email for each RED highlighted row
+        for _, row in red_highlighted_rows.iterrows():
+            send_email_alert(row)
 
         # Generate Processed Excel File
         processed_filepath = os.path.join(UPLOAD_FOLDER, 'processed_' + file.filename)
@@ -201,17 +139,9 @@ def upload_file():
                         fmt = workbook.add_format({'bg_color': color})
                         worksheet.write(idx + 1, sheet_df.columns.get_loc("Incident Id"), sheet_df.loc[row_idx, "Incident Id"], fmt)
 
-        # After generating the processed Excel, send email for RED-highlighted rows
-        red_rows = filter_red_rows(df)
-
-        if not red_rows.empty:
-            recipient_email = "lakshyarubi@gmail.com"  # Replace with the actual recipient's email
-            send_email_alert(red_rows, recipient_email)
-
         return send_file(processed_filepath, as_attachment=True)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-    app.run(debug=True, host='0.0.0.0', port=5000)
