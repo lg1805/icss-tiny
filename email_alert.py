@@ -1,12 +1,7 @@
+import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
-# Email configuration
-SENDER_EMAIL = 'lakshyarubi@gmail.com'
-SENDER_PASSWORD = 'selr fdih wlkm wufg'  # Replace with your app password or real password
-RECEIVER_EMAIL = 'lakshyarubi.gnana2021@vitstudent.ac.in'
-
 
 def send_email_alert(incident_id, observation, severity, occurrence,
                      detection, rpn, priority, creation_date):
@@ -23,30 +18,34 @@ def send_email_alert(incident_id, observation, severity, occurrence,
     - priority: str
     - creation_date: str or datetime
     """
-    # Email subject and body
+    # Load SMTP credentials from environment variables
+    sender_email = os.getenv('SENDER_EMAIL')
+    sender_password = os.getenv('SENDER_PASSWORD')
+    receiver_email = os.getenv('RECEIVER_EMAIL')
+
+    if not sender_email or not sender_password or not receiver_email:
+        print("EMAIL ALERT CONFIGURATION ERROR: Missing environment variables.")
+        return
+
+    # Prepare email content
     subject = f"Overdue Incident: {incident_id}"
-    body = f"""Dear User,
+    body = f"""Dear User,\n\n" \
+           f"Incident {incident_id} has been open for more than 3 days. Please see the details below:\n\n" \
+           f"- Observation: {observation}\n" \
+           f"- Severity: {severity}\n" \
+           f"- Occurrence: {occurrence}\n" \
+           f"- Detection: {detection}\n" \
+           f"- RPN: {rpn}\n" \
+           f"- Priority: {priority}\n" \
+           f"- Creation Date: {creation_date}\n\n" \
+           f"Please act now.\n\n" \
+           f"Best Regards,\n" \
+           f"ICSS Team"
 
-Incident {incident_id} has been open for more than 3 days. Please see the details:
-
-- Observation: {observation}
-- Severity: {severity}
-- Occurrence: {occurrence}
-- Detection: {detection}
-- RPN: {rpn}
-- Priority: {priority}
-- Creation Date: {creation_date}
-
-Please act now.
-
-Best Regards,
-ICSS Team
-"""
-
-    # Construct the email message
+    # Construct email
     msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
@@ -54,8 +53,22 @@ ICSS Team
     try:
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.login(sender_email, sender_password)
             server.send_message(msg)
-        print(f"Email sent to {RECEIVER_EMAIL}")
+        print(f"Email sent to {receiver_email}")
     except Exception as e:
-        print(f"Failed to send email to {RECEIVER_EMAIL}: {e}")
+        print(f"Failed to send email to {receiver_email}: {e}")
+
+
+if __name__ == '__main__':
+    # Simple test when running directly
+    send_email_alert(
+        incident_id='TEST123',
+        observation='Test observation',
+        severity=1,
+        occurrence=1,
+        detection=1,
+        rpn=1,
+        priority='Low',
+        creation_date='2025-04-28'
+    )
