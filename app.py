@@ -7,6 +7,9 @@ import pandas as pd
 from datetime import datetime
 from rapidfuzz import fuzz
 from concurrent.futures import ThreadPoolExecutor
+import logging
+app.config['PROPAGATE_EXCEPTIONS'] = True
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads/processed/'
