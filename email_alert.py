@@ -1,39 +1,64 @@
 import os
 import smtplib
-import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-# SMTP configuration
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-
-# Load environment variables
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
-RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
+# Load SMTP credentials from environment variables
+SENDER_EMAIL = os.getenv('SENDER_EMAIL')  # e.g. 'lakshyarubi@gmail.com'
+SENDER_PASSWORD = os.getenv('SENDER_PASSWORD')  # your app password
+RECEIVER_EMAIL = os.getenv('RECEIVER_EMAIL')  # 'lakshyarubi.gnana2021@vitstudent.ac.in'
 
 
-def test_smtp():
+def send_email_alert(incident_id, observation, severity, occurrence,
+                     detection, rpn, priority, creation_date):
     """
-    Sends a simple test email using SMTP with debug logging.
+    Sends an email alert for an overdue incident.
+
+    Parameters:
+    - incident_id: str or int
+    - observation: str
+    - severity: int
+    - occurrence: int
+    - detection: int
+    - rpn: int
+    - priority: str
+    - creation_date: str or datetime
     """
+    # Verify that credentials are set
     if not (SENDER_EMAIL and SENDER_PASSWORD and RECEIVER_EMAIL):
-        print("ERROR: Set SENDER_EMAIL, SENDER_PASSWORD, and RECEIVER_EMAIL environment vars.")
-        return
+        raise EnvironmentError("EMAIL_ALERT: Missing SENDER_EMAIL, SENDER_PASSWORD, or RECEIVER_EMAIL environment variable")
 
-    message = "Subject: SMTP Test\n\nThis is a test email from email_test.py"
-    context = ssl.create_default_context()
+    # Build email subject and body
+    subject = f"Overdue Incident: {incident_id}"
+    body = (
+        f"Dear User,\n\n"
+        f"Incident {incident_id} has been open for more than 3 days. Details:\n\n"
+        f"- Observation: {observation}\n"
+        f"- Severity: {severity}\n"
+        f"- Occurrence: {occurrence}\n"
+        f"- Detection: {detection}\n"
+        f"- RPN: {rpn}\n"
+        f"- Priority: {priority}\n"
+        f"- Creation Date: {creation_date}\n\n"
+        f"Please act now.\n\n"
+        f"Best Regards,\n"
+        f"ICSS Team"
+    )
 
+    # Construct MIME message
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = RECEIVER_EMAIL
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    # Send the email via SMTP
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.set_debuglevel(1)  # Enable SMTP debug output
-            server.starttls(context=context)
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, message)
-        print(f"Test email sent successfully to {RECEIVER_EMAIL}")
+            server.send_message(msg)
+        print(f"Email sent to {RECEIVER_EMAIL}")
     except Exception as e:
-        print("SMTP test failed:", e)
-
-
-if __name__ == "__main__":
-    test_smtp()
+        print(f"Failed to send email: {e}")
 
