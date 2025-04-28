@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request, render_template, send_file, abort
 import pandas as pd
 import os
@@ -26,7 +25,6 @@ rpn_data = pd.read_excel(RPN_FILE)
 known_components = rpn_data['Component'].dropna().unique().tolist()
 executor = ThreadPoolExecutor(max_workers=4)
 
-
 def extract_component(obs):
     obs_str = str(obs).strip()
     best_match, best_score = None, 0
@@ -53,8 +51,8 @@ def determine_priority(rpn):
 
 
 def send_email(to_email, subject, body):
-    sender_email = 'lakshyarubi@gmail.com'
-    sender_password = 'selr fdih wlkm wufg'  # Use your app password
+    sender_email = 'lakshyarubi@gmail.com'  # Your email
+    sender_password = 'selr fdih wlkm wufg'  # Use your app-specific password for Gmail
     try:
         msg = MIMEMultipart()
         msg['From'] = sender_email
@@ -63,8 +61,8 @@ def send_email(to_email, subject, body):
         msg.attach(MIMEText(body, 'plain'))
 
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.set_debuglevel(1)
-            server.starttls()
+            server.set_debuglevel(1)  # Enable debug level for detailed log
+            server.starttls()  # Secure connection
             server.login(sender_email, sender_password)
             server.send_message(msg)
         app.logger.info(f"Email sent to {to_email}")
@@ -145,5 +143,4 @@ def upload_file():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-```
 
