@@ -6,6 +6,7 @@ import xlsxwriter
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email_alert import send_email_alert
 from rapidfuzz import fuzz
 from concurrent.futures import ThreadPoolExecutor
 
@@ -95,7 +96,17 @@ def send_email(to_email, subject, body):
 @app.route('/')
 def index():
     return render_template('frontNEW.html')
-
+    
+@app.route('/send_email_alert', methods=['POST'])
+def send_email_alert_route():
+    # Process the uploaded file (same logic as before)
+    # Get the file and other required data (e.g., Subject, Body)
+    file = request.files['file']
+    
+    # Call send_email_alert function
+    send_email_alert('receiver_email@example.com', 'Subject of Email', 'Body of the Email')
+    
+    return 'Email Sent!'
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
