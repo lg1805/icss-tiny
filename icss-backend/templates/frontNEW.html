@@ -3,133 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICSS | Complaint Classifier</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="icon" href="static/favicon.ico" type="image/x-icon">
+    <title>ICSS Web App</title>
     <style>
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #e8f7f1;
-            color: #333;
-            margin: 0;
-            padding: 50px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            font-family: Arial, sans-serif;
+            background-color: #d9f2e6;
             text-align: center;
+            padding: 50px;
         }
         .container {
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            padding: 40px;
-            width: 100%;
             max-width: 600px;
-            transition: all 0.3s ease-in-out;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         img {
-            width: 120px;
-            margin-bottom: 20px;
+            width: 100%;
+            max-width: 500px;
+            display: block;
+            margin: 10px auto;
+            border-radius: 10px;
         }
         h2 {
-            font-size: 28px;
-            font-weight: 500;
-            color: #2c3e50;
+            color: #333;
+            font-size: 24px;
             margin-bottom: 15px;
         }
         p {
             font-size: 16px;
-            color: #7f8c8d;
+            color: #555;
         }
-        .file-input, .month-input, .nlp-toggle {
-            margin: 25px 0;
+        .file-input,
+        .month-input {
+            margin: 20px 0;
         }
-        input[type="file"], select {
-            padding: 12px 18px;
-            border: 2px solid #3498db;
-            border-radius: 8px;
+        input[type="file"],
+        select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
             width: 100%;
-            font-size: 16px;
-            transition: border 0.3s ease;
-        }
-        input[type="file"]:focus, select:focus {
-            border-color: #2980b9;
-            outline: none;
         }
         label {
             font-size: 16px;
             color: #333;
-            text-align: left;
             display: block;
-            margin-bottom: 10px;
+            text-align: left;
+            margin-bottom: 5px;
         }
         button {
-            background-color: #3498db;
+            background-color: #007bff;
             color: white;
-            padding: 15px 20px;
+            padding: 12px 20px;
             border: none;
-            border-radius: 8px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 16px;
             width: 100%;
-            transition: background-color 0.3s ease;
         }
         button:hover {
-            background-color: #2980b9;
-        }
-        .error-message, .success-message {
-            padding: 12px;
-            margin-top: 15px;
-            border-radius: 6px;
-            font-weight: bold;
+            background-color: #0056b3;
         }
         .error-message {
-            background-color: #f2dede;
-            color: #a94442;
-            border: 1px solid #ebccd1;
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
         }
         .success-message {
-            background-color: #dff0d8;
-            color: #3c763d;
-            border: 1px solid #d6e9c6;
-        }
-        .nlp-toggle {
-            text-align: left;
-        }
-        .nlp-toggle label {
-            display: flex;
-            align-items: center;
-            font-size: 16px;
-        }
-        .nlp-toggle input {
-            margin-right: 10px;
-        }
-        .file-info {
-            font-size: 14px;
-            color: #95a5a6;
-            margin-top: 5px;
-        }
-        @media (max-width: 768px) {
-            .container {
-                padding: 25px;
-            }
-            h2 {
-                font-size: 24px;
-            }
+            color: green;
+            font-weight: bold;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <img src="static/logo.png" alt="ICSS Logo">
-        <h2>ICSS for Complaint Classification</h2>
-        <p>Upload your complaint Excel sheet and get the processed results.</p>
+        <img src="static/image1.1.png" alt="Priority Image">
+
+        <h2>ICSS for CPCBIV+ Infant Care Meet</h2>
+        <p>Upload Complaints Excel Sheet</p>
 
         <form action="/upload" method="post" enctype="multipart/form-data">
             <div class="file-input">
-                <input type="file" name="complaint_file" accept=".xlsx" required>
-                <small class="file-info">Only .xlsx format is accepted.</small>
+                <input type="file" name="complaint_file" required>
             </div>
 
             <div class="month-input">
@@ -155,10 +113,10 @@
         </form>
 
         {% if error %}
-            <div class="error-message">{{ error }}</div>
+            <p class="error-message">{{ error }}</p>
         {% endif %}
         {% if success_message %}
-            <div class="success-message">{{ success_message }}</div>
+            <p class="success-message">{{ success_message }}</p>
         {% endif %}
     </div>
 </body>
