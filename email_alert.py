@@ -1,45 +1,39 @@
 import os
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import ssl
 
-def send_email_alert(subject, body):
-    # Retrieve email credentials from environment variables
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_password = os.getenv("SENDER_PASSWORD")
-    receiver_email = os.getenv("RECEIVER_EMAIL")
+# SMTP configuration
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
 
-    # Check for missing environment variables
-    if not sender_email or not sender_password or not receiver_email:
-        raise ValueError("Missing required email environment variables!")
+# Load environment variables
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
+
+
+def test_smtp():
+    """
+    Sends a simple test email using SMTP with debug logging.
+    """
+    if not (SENDER_EMAIL and SENDER_PASSWORD and RECEIVER_EMAIL):
+        print("ERROR: Set SENDER_EMAIL, SENDER_PASSWORD, and RECEIVER_EMAIL environment vars.")
+        return
+
+    message = "Subject: SMTP Test\n\nThis is a test email from email_test.py"
+    context = ssl.create_default_context()
 
     try:
-        # Create the MIME message
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = receiver_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Establish the SMTP connection and send the email
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()  # Start TLS encryption
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-
-        print(f"Email sent to {receiver_email}")
-
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.set_debuglevel(1)  # Enable SMTP debug output
+            server.starttls(context=context)
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, message)
+        print(f"Test email sent successfully to {RECEIVER_EMAIL}")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print("SMTP test failed:", e)
 
-# Self-test if running as a standalone script
+
 if __name__ == "__main__":
-    subject = "Test Email"
-    body = """Dear User,
+    test_smtp()
 
-This is a test email sent from the system.
-
-Best Regards,
-ICSS Team
-"""
-    send_email_alert(subject, body)
