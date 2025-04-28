@@ -1,256 +1,149 @@
+# app.py
 from flask import Flask, request, render_template, send_file, abort
 import pandas as pd
 import os
 from datetime import datetime
-import xlsxwriter
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email_alert import send_email_alert
 from rapidfuzz import fuzz
 from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'processed')
+
+# File paths and folders
+dir_base = os.path.dirname(__file__)
+UPLOAD_FOLDER = os.path.join(dir_base, 'uploads', 'processed')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-RPN_FILE = os.path.join(os.path.dirname(__file__), 'ProcessedData', 'RPN.xlsx')
+# RPN lookup file
+RPN_FILE = os.path.join(dir_base, 'ProcessedData', 'RPN.xlsx')
 if not os.path.exists(RPN_FILE):
     raise FileNotFoundError(f"RPN file not found at {RPN_FILE}")
 
-# Load the RPN data
+# Load RPN data
 rpn_data = pd.read_excel(RPN_FILE)
-known_components = rpn_data["Component"].dropna().unique().tolist()
+known_components = rpn_data['Component'].dropna().unique().tolist()
 executor = ThreadPoolExecutor(max_workers=4)
 
 
 def extract_component(obs):
     obs_str = str(obs).strip()
-    best_match, highest_score = None, 0
+    best_match, best_score = None, 0
     for comp in known_components:
         score = fuzz.partial_ratio(comp.lower(), obs_str.lower())
-        if score >= 80 and score > highest_score:
-            best_match, highest_score = comp, score
-    return best_match or "Unknown"
+        if score >= 80 and score > best_score:
+            best_match, best_score = comp, score
+    return best_match or 'Unknown'
 
 
 def get_rpn_values(component):
-    row = rpn_data[rpn_data["Component"] == component]
-    if not row.empty:
-        s, o, d = row.iloc[0]["Severity (S)"], row.iloc[0]["Occurrence (O)"], row.iloc[0]["Detection (D)"]
-        # Type-check and convert
-        try:
-            s = float(s) if not isinstance(s, (int, float)) else s
-            o = float(o) if not isinstance(o, (int, float)) else o
-            d = float(d) if not isinstance(d, (int, float)) else d
-        except Exception:
-            app.logger.warning(f"Invalid RPN values for component '{component}', using defaults")
-            return 1, 1, 10
+    row = rpn_data[rpn_data['Component'] == component]
+    if row.empty:
+        return 1, 1, 10
+    s, o, d = row.iloc[0]['Severity (S)'], row.iloc[0]['Occurrence (O)'], row.iloc[0]['Detection (D)']
+    try:
         return int(s), int(o), int(d)
-    return 1, 1, 10
+    except:
+        return 1, 1, 10
 
 
 def determine_priority(rpn):
-    return "High" if rpn >= 200 else "Moderate" if rpn >= 100 else "Low"
+    return 'High' if rpn >= 200 else 'Moderate' if rpn >= 100 else 'Low'
 
 
-def month_str_to_num(month_hint):
-    months = {m[:3].lower(): f"{i:02d}" for i, m in enumerate(
-        ["January","February","March","April","May","June",
-         "July","August","September","October","November","December"], 1)}
-    return months.get(month_hint[:3].lower())
-
-
-def format_creation_date(date_str, month_hint):
-    target_m = month_str_to_num(month_hint)
+def send_email(to_email, subject, body):
+    sender_email = 'lakshyarubi@gmail.com'
+    sender_password = 'selr fdih wlkm wufg'  # Use your app password
     try:
-        dt = pd.to_datetime(str(date_str).strip(), errors='coerce', dayfirst=True)
-        if pd.isna(dt):
-            return None, None
-        dd, mm, yy = dt.day, dt.month, dt.year
-        if dd == 1 and mm == 1 and target_m:
-            mm = int(target_m)
-        formatted = f"{dd:02d}/{mm:02d}/{yy}"
-        return formatted, (datetime.now() - dt).days
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.set_debuglevel(1)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        app.logger.info(f"Email sent to {to_email}")
     except Exception as e:
-        app.logger.error(f"Error parsing date '{date_str}': {e}")
-        return None, None
-
-
---- a/app.py
-+++ b/app.py
-@@
- def send_email(to_email, subject, body):
--    sender_email = 'lakshyarubi@gmail.com'
--    sender_password = 'selr fdih wlkm wufg'
--    try:
--        msg = MIMEMultipart()
--        msg['From'], msg['To'], msg['Subject'] = sender_email, to_email, subject
--        msg.attach(MIMEText(body, 'plain'))
--        with smtplib.SMTP('smtp.gmail.com', 587) as server:
--            server.starttls()
--            server.login(sender_email, sender_password)
--            server.send_message(msg)
--        app.logger.info(f"Email sent to {to_email}")
--    except Exception as e:
--        app.logger.error(f"Failed to send email to {to_email}: {e}")
-+    # exactly the code you tested in VS Code
-+    sender_email   = 'lakshyarubi@gmail.com'
-+    sender_password= 'selr fdih wlkm wufg'  # your app-specific password
-+    try:
-+        msg = MIMEMultipart()
-+        msg['From']    = sender_email
-+        msg['To']      = to_email
-+        msg['Subject'] = subject
-+        msg.attach(MIMEText(body, 'plain'))
-+
-+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-+            server.set_debuglevel(1)       # turn on SMTP debug
-+            server.starttls()
-+            server.login(sender_email, sender_password)
-+            server.send_message(msg)
-+
-+        app.logger.info(f"Email sent to {to_email}")
-+    except smtplib.SMTPException as e:
-+        app.logger.error(f"SMTP error occurred: {e}")
-+    except Exception as e:
-+        app.logger.error(f"Failed to send email to {to_email}: {e}")
-@@ def upload_file():
-     # write out processed Excel, etc.
-     app.logger.info(f"Written processed file to {processed}")
-+
-+    # --- right after processing, check for overdue and send ---
-+    df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce')
-+    days_elapsed = (datetime.now() - df['Creation Date']).dt.days
-+    overdue = df[
-+        (df['Incident Status'].str.lower() == 'open') &
-+        (days_elapsed > 3)
-+    ]
-+    app.logger.debug(f"Overdue incidents count: {len(overdue)}")
-+    for _, row in overdue.iterrows():
-+        subject = f"Incident {row['Incident Id']} - Action Required"
-+        body = (
-+            f"Dear User,\n\n"
-+            f"Incident {row['Incident Id']} has been open for {days_elapsed.loc[_]} days. Details:\n"
-+            f"Obs: {row['Observation']}\n"
-+            f"Severity: {row['Severity (S)']}\n"
-+            f"Occurrence: {row['Occurrence (O)']}\n"
-+            f"Detection: {row['Detection (D)']}\n"
-+            f"RPN: {row['RPN']}\n"
-+            f"Priority: {row['Priority']}\n"
-+            f"Created: {row['Creation Date']}\n\n"
-+            f"Please address this promptly.\n"
-+            f"ICSS Team"
-+        )
-+        send_email(row['Email'], subject, body)
-+
-     return send_file(processed, as_attachment=True)
-
+        app.logger.error(f"Failed to send email to {to_email}: {e}")
 
 
 @app.route('/')
 def index():
     return render_template('frontNEW.html')
-    
-@app.route('/send_email_alert', methods=['POST'])
-def send_email_alert_route():
-    # Process the uploaded file (same logic as before)
-    # Get the file and other required data (e.g., Subject, Body)
-    file = request.files['file']
-    
-    # Call send_email_alert function
-    send_email_alert('receiver_email@example.com', 'Subject of Email', 'Body of the Email')
-    
-    return 'Email Sent!'
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    # Basic upload checks
     if 'complaint_file' not in request.files:
         abort(400, 'No complaint_file part')
     file = request.files['complaint_file']
-    if not file or file.filename.strip() == '':
+    if not file or not file.filename:
         abort(400, 'No selected file')
 
-    month_hint = request.form.get('month_hint', '')
-    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(filepath)
-    app.logger.info(f"Saved upload to {filepath}")
+    # Save upload
+    in_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(in_path)
+    app.logger.info(f"Saved upload to {in_path}")
 
+    # Read data
     try:
-        df = pd.read_excel(filepath)
+        df = pd.read_excel(in_path)
     except Exception as e:
-        app.logger.error(f"Error reading Excel: {e}")
-        abort(400, f"Error reading file: {e}")
+        abort(400, f"Error reading Excel: {e}")
 
     # Required columns
-    needed = ['Observation', 'Creation Date', 'Incident Id', 'Incident Status']
-    missing = [c for c in needed if c not in df.columns]
+    required = ['Observation', 'Creation Date', 'Incident Id', 'Incident Status', 'Email']
+    missing = [c for c in required if c not in df.columns]
     if missing:
         abort(400, f"Missing columns: {', '.join(missing)}")
 
-    # Debug head
-    app.logger.debug(f"DataFrame head:\n{df.head()}")
+    # Date and elapsed
+    df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce')
+    df['Days Elapsed'] = (datetime.now() - df['Creation Date']).dt.days
 
-    # Date formatting
-    formatted = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
-    df['Creation Date'] = formatted.map(lambda x: x[0])
-    days_elapsed = formatted.map(lambda x: x[1]).fillna(0).astype(int)
-    app.logger.debug(f"Days elapsed sample: {days_elapsed.head()}")
-
-    # Component extraction and RPN parallel
+    # Component and RPN
     df['Component'] = list(executor.map(extract_component, df['Observation']))
     rpn_vals = list(executor.map(get_rpn_values, df['Component']))
     df[['Severity (S)', 'Occurrence (O)', 'Detection (D)']] = pd.DataFrame(rpn_vals, index=df.index)
     df['RPN'] = df['Severity (S)'] * df['Occurrence (O)'] * df['Detection (D)']
     df['Priority'] = df['RPN'].apply(determine_priority)
 
-    # Segregate
-    mask_spn = df['Observation'].str.contains('spn', case=False, na=False)
-    spn_df, non_spn_df = df[mask_spn].copy(), df[~mask_spn].copy()
-    order = {'High':1, 'Moderate':2, 'Low':3}
-    spn_df.sort_values('Priority', key=lambda x: x.map(order), inplace=True)
-    non_spn_df.sort_values('Priority', key=lambda x: x.map(order), inplace=True)
+    # Write processed file
+    out_name = f"processed_{file.filename}"
+    out_path = os.path.join(UPLOAD_FOLDER, out_name)
+    with pd.ExcelWriter(out_path, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False)
+    app.logger.info(f"Written processed file to {out_path}")
 
-    # Write Excel
-    processed = os.path.join(UPLOAD_FOLDER, f"processed_{file.filename}")
-    with pd.ExcelWriter(processed, engine='xlsxwriter') as writer:
-        for name, sheet in (('SPN', spn_df), ('Non-SPN', non_spn_df)):
-            sheet.to_excel(writer, sheet_name=name, index=False)
-            wb, ws = writer.book, writer.sheets[name]
-            green = wb.add_format({'bg_color':'#C6EFCE'})
-            for i, idx in enumerate(sheet.index, start=1):
-                status = str(sheet.at[idx, 'Incident Status']).lower()
-                col_id = sheet.columns.get_loc('Incident Id')
-                col_st = sheet.columns.get_loc('Incident Status')
-                if 'closed' in status or 'complete' in status:
-                    ws.write(i, col_st, sheet.at[idx, 'Incident Status'], green)
-                else:
-                    color = ['#ADD8E6','#FFFF00','#FF1493','#FF0000'][min(days_elapsed.at[idx], 4)-1] if days_elapsed.at[idx] > 0 else None
-                    if color:
-                        ws.write(i, col_id, sheet.at[idx, 'Incident Id'], wb.add_format({'bg_color': color}))
-    app.logger.info(f"Written processed file to {processed}")
+    # Send emails for overdue incidents
+    overdue = df[(df['Incident Status'].str.lower() == 'open') & (df['Days Elapsed'] > 3)]
+    app.logger.info(f"Overdue count: {len(overdue)}")
+    for _, row in overdue.iterrows():
+        subj = f"Incident {row['Incident Id']} - Action Required"
+        body = (
+            f"Dear User,\n\n"
+            f"Incident {row['Incident Id']} has been open for {row['Days Elapsed']} days. Details:\n"
+            f"Observation: {row['Observation']}\n"
+            f"Severity: {row['Severity (S)']}\n"
+            f"Occurrence: {row['Occurrence (O)']}\n"
+            f"Detection: {row['Detection (D)']}\n"
+            f"RPN: {row['RPN']}\n"
+            f"Priority: {row['Priority']}\n"
+            f"Created: {row['Creation Date']}\n\n"
+            f"Please address this promptly.\n"
+            f"ICSS Team"
+        )
+        send_email(row['Email'], subj, body)
 
-    # Verify file exists before sending
-    if not os.path.exists(processed):
-        app.logger.error(f"Processed file not found: {processed}")
-        abort(500, "Processed file missing")
-
-    # Email alerts
-    receiver_email = 'lakshyarubi.gnana2021@vitstudent.ac.in'
-    if 'Email' in df.columns:
-        overdue = df[(df['Incident Status'].str.lower()=='open') & (days_elapsed>3)]
-        for _, row in overdue.iterrows():
-            subj = f"Overdue Incident: {row['Incident Id']}"
-            body = (f"Dear User,\nIncident {row['Incident Id']} open >3 days. Details:\n"
-                    f"Obs: {row['Observation']}\nSeverity: {row['Severity (S)']}\n"
-                    f"Occurrence: {row['Occurrence (O)']}\nDetection: {row['Detection (D)']}\n"
-                    f"RPN: {row['RPN']}\nPriority: {row['Priority']}\n"
-                    f"Created: {row['Creation Date']}\n\nPlease act now.\nICSS Team")
-            send_email(receiver_email, subj, body)
-
-    return send_file(processed, as_attachment=True)
+    return send_file(out_path, as_attachment=True)
 
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+```
+
