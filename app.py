@@ -77,20 +77,75 @@ def format_creation_date(date_str, month_hint):
         return None, None
 
 
-def send_email(to_email, subject, body):
-    sender_email = 'lakshyarubi@gmail.com'
-    sender_password = 'selr fdih wlkm wufg'
-    try:
-        msg = MIMEMultipart()
-        msg['From'], msg['To'], msg['Subject'] = sender_email, to_email, subject
-        msg.attach(MIMEText(body, 'plain'))
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        app.logger.info(f"Email sent to {to_email}")
-    except Exception as e:
-        app.logger.error(f"Failed to send email to {to_email}: {e}")
+--- a/app.py
++++ b/app.py
+@@
+ def send_email(to_email, subject, body):
+-    sender_email = 'lakshyarubi@gmail.com'
+-    sender_password = 'selr fdih wlkm wufg'
+-    try:
+-        msg = MIMEMultipart()
+-        msg['From'], msg['To'], msg['Subject'] = sender_email, to_email, subject
+-        msg.attach(MIMEText(body, 'plain'))
+-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+-            server.starttls()
+-            server.login(sender_email, sender_password)
+-            server.send_message(msg)
+-        app.logger.info(f"Email sent to {to_email}")
+-    except Exception as e:
+-        app.logger.error(f"Failed to send email to {to_email}: {e}")
++    # exactly the code you tested in VS Code
++    sender_email   = 'lakshyarubi@gmail.com'
++    sender_password= 'selr fdih wlkm wufg'  # your app-specific password
++    try:
++        msg = MIMEMultipart()
++        msg['From']    = sender_email
++        msg['To']      = to_email
++        msg['Subject'] = subject
++        msg.attach(MIMEText(body, 'plain'))
++
++        with smtplib.SMTP('smtp.gmail.com', 587) as server:
++            server.set_debuglevel(1)       # turn on SMTP debug
++            server.starttls()
++            server.login(sender_email, sender_password)
++            server.send_message(msg)
++
++        app.logger.info(f"Email sent to {to_email}")
++    except smtplib.SMTPException as e:
++        app.logger.error(f"SMTP error occurred: {e}")
++    except Exception as e:
++        app.logger.error(f"Failed to send email to {to_email}: {e}")
+@@ def upload_file():
+     # write out processed Excel, etc.
+     app.logger.info(f"Written processed file to {processed}")
++
++    # --- right after processing, check for overdue and send ---
++    df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce')
++    days_elapsed = (datetime.now() - df['Creation Date']).dt.days
++    overdue = df[
++        (df['Incident Status'].str.lower() == 'open') &
++        (days_elapsed > 3)
++    ]
++    app.logger.debug(f"Overdue incidents count: {len(overdue)}")
++    for _, row in overdue.iterrows():
++        subject = f"Incident {row['Incident Id']} - Action Required"
++        body = (
++            f"Dear User,\n\n"
++            f"Incident {row['Incident Id']} has been open for {days_elapsed.loc[_]} days. Details:\n"
++            f"Obs: {row['Observation']}\n"
++            f"Severity: {row['Severity (S)']}\n"
++            f"Occurrence: {row['Occurrence (O)']}\n"
++            f"Detection: {row['Detection (D)']}\n"
++            f"RPN: {row['RPN']}\n"
++            f"Priority: {row['Priority']}\n"
++            f"Created: {row['Creation Date']}\n\n"
++            f"Please address this promptly.\n"
++            f"ICSS Team"
++        )
++        send_email(row['Email'], subject, body)
++
+     return send_file(processed, as_attachment=True)
+
 
 
 @app.route('/')
