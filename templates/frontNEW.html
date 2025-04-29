@@ -80,7 +80,8 @@
 </head>
 <body>
     <div class="container">
-        <img src="static/image1.1.png" alt="Priority Image">
+        <!-- Flask to dynamically serve the image -->
+        <img src="{{ url_for('static', filename='images/priority.png') }}" alt="Priority Image">
 
         <h2>ICSS</h2>
         <p>Upload Complaints Excel Sheet</p>
@@ -121,3 +122,4 @@
     </div>
 </body>
 </html>
+
