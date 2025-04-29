@@ -106,22 +106,44 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    file = request.files.get('complaint_file')
-    if not file or file.filename=='':
-        return "No file provided", 400
-
-    month_hint = request.form.get('month_hint','default')
-    path       = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(path)
-
     try:
-        df = pd.read_excel(path)
-    except Exception as e:
-        return f"Error reading file: {e}", 400
+        if 'complaint_file' not in request.files:
+            return "No complaint_file part", 400
 
-    required = ['Observation','Creation Date','Incident Id']
-    if not all(col in df.columns for col in required):
-        return "Required columns missing", 400
+        file = request.files['complaint_file']
+        if file.filename == '':
+            return "No selected file", 400
+
+        month_hint = request.form.get('month_hint', 'default')
+
+        if file:
+            filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+            file.save(filepath)
+
+            try:
+                df = pd.read_excel(filepath)
+            except Exception as e:
+                return f"Error reading file: {e}", 400
+
+            if 'Observation' not in df.columns or 'Creation Date' not in df.columns or 'Incident Id' not in df.columns:
+                return "Required columns missing", 400
+
+            formatted_dates = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
+            df['Creation Date'] = formatted_dates.apply(lambda x: x[0])
+            days_elapsed = formatted_dates.apply(lambda x: x[1])
+
+            # ... (rest of your code)
+
+            # Send Email for Open/Pending Incidents
+            alert_df = df[df["Incident Status"].str.lower().isin(["open", "pending"])]
+            send_alert_email(alert_df)
+
+            return send_file(processed_filepath, as_attachment=True)
+
+    except Exception as e:
+        print(f"❌ Error: {e}")  # Log the error
+        return f"An error occurred: {e}", 500
+
 
     # Format dates & compute elapsed days
     fmt = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
