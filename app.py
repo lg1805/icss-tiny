@@ -125,14 +125,94 @@ def upload_file():
             except Exception as e:
                 return f"Error reading file: {e}", 400
 
-            if 'Observation' not in df.columns or 'Creation Date' not in df.columns or 'Incident Id' not in df.columns:
+            if 'Observation' not in df.columns or 'Creation Date' not in df.columns or 'Incident Id' not in df.columns or 'Incident Status' not in df.columns:
                 return "Required columns missing", 400
 
+            # Format dates & compute elapsed days
+            fmt = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
+            df['Creation Date'] = fmt.apply(lambda x: x[0])
+            days_elapsed = fmt.apply(lambda x: x[1])
+            df['Days Elapsed'] = days_elapsed
+
+            # Month abbreviation
+            df['Creation_DT'] = pd.to_datetime(df['Creation Date'], dayfirst=True, errors='coerce')
+            df['Month'] = df['Creation_DT'].dt.strftime('%b')
+            df.drop(columns=['Creation_DT'], inplace=True)
+
+            # Component matching & RPN calculation
+            df['Component'] = list(executor.map(extract_component, df['Observation']))
+            rpn_vals = list(executor.map(get_rpn_values, df['Component']))
+            df[['Severity (S)', 'Occurrence (O)', 'Detection (D)']] = pd.DataFrame(rpn_vals, index=df.index)
+            df['RPN'] = df['Severity (S)'] * df['Occurrence (O)'] * df['Detection (D)']
+            df['Priority'] = df['RPN'].apply(determine_priority)
+
+            # Segregate and write Excel
+            spn_df = df[df['Observation'].str.contains('spn', case=False, na=False)]
+            non_spn = df[~df['Observation'].str.contains('spn', case=False, na=False)]
+            order_map = {'High': 1, 'Moderate': 2, 'Low': 3}
+            spn_df = spn_df.sort_values(by='Priority', key=lambda x: x.map(order_map))
+            non_spn = non_spn.sort_values(by='Priority', key=lambda x: x.map(order_map))
+
+            out_path = os.path.join(UPLOAD_FOLDER, 'processed_' + file.filename)
+            with pd.ExcelWriter(out_path, engine='xlsxwriter', engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
+                for name, sheet in [('SPN', spn_df), ('Non-SPN', non_spn)]:
+                    sheet.fillna('', inplace=True)
+                    sheet.to_excel(writer, sheet_name=name, index=False)
+                    wb = writer.book
+                    ws = writer.sheets[name]
+                    green = wb.add_format({'bg_color': '#C6EFCE'})
+                    for i, idx in enumerate(sheet.index):
+                        elapsed = days_elapsed.loc[idx]
+                        status = str(sheet.at[idx, 'Incident Status']).lower()
+                        if 'closed' in status or 'complete' in status:
+                            ws.write(i + 1, sheet.columns.get_loc('Incident Status'), sheet.at[idx, 'Incident Status'], green)
+
+            # Send only escalated open/pending
+            alert_df = df[(df['Incident Status'].str.lower().isin(['open', 'pending'])) & (df['Days Elapsed'] >= 3)]
+            cols = ['Sr.No', 'Incident Id', 'Creation Date', 'Month', 'Days Elapsed', 'KVA Rating',
+                    'Engine no', 'Customer VOC', 'SR Status', 'Account Name', 'Service Dealer Name',
+                    'Running hours', 'Observation', 'Incident Status', 'ASM Name']
+            alert_df = alert_df[cols]
+            executor.submit(send_alert_email, alert_df)
+
+            return send_file(out_path, as_attachment=True)
+
+    except Exception as e:
+        print(f"❌ Error: {e}")  # Log the error
+        return f"An error occurred: {e}", 500
+
+
+            # Format Creation Date and calculate Days elapsed
             formatted_dates = df['Creation Date'].apply(lambda x: format_creation_date(x, month_hint))
             df['Creation Date'] = formatted_dates.apply(lambda x: x[0])
             days_elapsed = formatted_dates.apply(lambda x: x[1])
 
-            # ... (rest of your code)
+            df["Delay Days"] = days_elapsed
+            df["Month"] = month_hint.capitalize()
+
+            # Filter Open or Pending Incidents which have Delay Days > 3
+            alert_df = df[
+                (df["Incident Status"].str.lower().isin(["open", "pending"])) &
+                (df["Delay Days"] > 3)
+            ]
+
+            if alert_df.empty:
+                return "No delayed open/pending cases found.", 200
+
+            # Save the filtered DataFrame
+            processed_filename = 'delayed_alerts_' + file.filename
+            processed_filepath = os.path.join(UPLOAD_FOLDER, processed_filename)
+            alert_df.to_excel(processed_filepath, index=False)
+
+            # Send Email
+            send_alert_email(alert_df)
+
+            return send_file(processed_filepath, as_attachment=True)
+
+    except Exception as e:
+        print(f"❌ Error: {e}")  # Log the error
+        return f"An error occurred: {e}", 500
+
 
             # Send Email for Open/Pending Incidents
             alert_df = df[df["Incident Status"].str.lower().isin(["open", "pending"])]
