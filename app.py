@@ -70,6 +70,7 @@ def send_alert_email(df_filtered):
         return
     sender_email = "lakshyarubi@gmail.com"
     receiver_email = "lakshyarubi.gnana2021@vitstudent.ac.in"
+    receiver_email = "Sameer.kambli@kirloskar.com"
     app_password = "selr fdih wlkm wufg"  # Use App Password
 
     html_table = df_filtered.to_html(index=False)
