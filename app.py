@@ -163,7 +163,7 @@ def upload_file():
 
         # Alert logic
         alert_df = df[(df['Incident Status'].str.lower().isin(['open', 'pending'])) & (df['Days Elapsed'] >= 3)]
-        alert_cols = ['Incident Id', 'Creation Date', 'Month', 'Days Elapsed', 'Observation', 'Engine no', 'Service Dealer Name', 'Incident Status']
+        alert_cols = ['Incident Id', 'Zone', 'Creation Date', 'Month', 'Days Elapsed', 'Observation', 'Engine no', 'Service Dealer Name', 'Incident Status']
         alert_df = alert_df[alert_cols]
         executor.submit(send_alert_email, alert_df)
 
