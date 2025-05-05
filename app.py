@@ -120,7 +120,7 @@ def upload_file():
 
         df = pd.read_excel(filepath)
 
-        required_cols = ['Observation', 'Creation Date', 'Incident Id', 'Incident Status']
+        required_cols = ['Observation', 'Creation Date', 'Incident Id']
         if not all(col in df.columns for col in required_cols):
             return "Required columns missing", 400
 
