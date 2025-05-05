@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICSS Web App</title>
+    <title>ICSS \Web App</title> 
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -36,7 +36,8 @@
             color: #555;
         }
         .file-input,
-        .month-input {
+        .month-input,
+        .emission-input {
             margin: 20px 0;
         }
         input[type="file"],
@@ -111,6 +112,18 @@
                 </select>
             </div>
 
+            <div class="emission-input">
+                <label for="emission_control">Select Emission Control:</label>
+                <select name="emission_control" id="emission_control" required>
+                    <option value="">--Select Emission Control--</option>
+                    <option value="CPCBII">CPCBII</option>
+                    <option value="CPCBIV+">CPCBIV+</option>
+                    <option value="BSII">BSII</option>
+                    <option value="BSIV">BSIV</option>
+                    <option value="BSV">BSV</option>
+                </select>
+            </div>
+
             <button type="submit">Process and Download</button>
         </form>
 
@@ -123,4 +136,3 @@
     </div>
 </body>
 </html>
-
